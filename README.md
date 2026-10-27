@@ -1,8 +1,9 @@
 # localcloud
 
 `localcloud` is a command line tool for running a local cloud environment for
-development. This repository holds the initial Go project: a small,
-dependency-free CLI that can be installed with `go install`.
+development. This repository holds the initial Go project: a small CLI that can
+be installed with `go install`; the only third-party dependency is a YAML
+parser used for the workspace settings.
 
 ## Requirements
 
@@ -82,6 +83,54 @@ it would initialize and exits with code 1. Run `localcloud help init` (or
 `localcloud init --help`) for its syntax. Workspace scaffolding itself will be
 added in a follow-up task.
 
+## Configuration
+
+The settings of a workspace are stored in `localcloud.yaml` in the workspace
+directory:
+
+```yaml
+infra:
+  network:
+    name: localcloud
+    subnet: 172.28.0.0/16
+  services:
+    - name: postgres
+      kind: database
+      version: "16"
+      port: 5432
+    - name: rabbitmq
+      kind: message_bus
+      port: 5672
+
+services:
+  - name: api
+    port: 8080
+    depends_on:
+      - postgres
+```
+
+The settings are grouped into two blocks:
+
+- `infra` — the stateful services, such as databases and message buses, and the
+  network they share (`name` and `subnet` in CIDR notation);
+- `services` — the stateless services running on top of the infrastructure,
+  where `depends_on` lists the infra services a service needs.
+
+The `kind` of an infra service is `database` or `message_bus`; `version` is
+optional and falls back to the default version of that service.
+
+The settings are handled by the configurator — the business logic module other
+modules get their settings from. It validates them instead of running with
+inconsistent input: empty or malformed network settings, repeated service
+names, unknown service kinds, ports outside 1–65535 and dependencies on
+services that are not described are reported as errors. Unknown keys are
+rejected too, so a typo does not silently disappear. A missing, empty or
+unreadable file is reported separately from invalid settings.
+
+The configurator does not know about the file: it works with a repository port,
+and reading and writing `localcloud.yaml` is the job of the
+`internal/adapters/configfile` adapter.
+
 ## Architecture
 
 The project follows clean architecture: layers are separated and dependencies
@@ -90,20 +139,23 @@ business logic, never the other way round.
 
 | Layer | Package | Responsibility |
 |-------|---------|----------------|
-| Adapters | `internal/adapters/cli` | Terminal client: argument parsing, help, output formatting and exit codes. |
+| Adapters | `internal/adapters/cli`, `internal/adapters/configfile` | Terminal client (argument parsing, help, output formatting, exit codes) and the YAML storage of the workspace settings. |
 | Use cases | `internal/usecases` | User scenarios behind commands, for now `init`: they orchestrate the actions of the business logic. |
-| Business logic | `internal/domain/workspace` | Rules of a local cloud workspace and the concrete actions performed on it. |
+| Business logic | `internal/domain/workspace`, `internal/domain/config` | Rules of a local cloud workspace, the actions performed on it and the configurator that keeps the settings for the other modules. |
 
 Rules:
 
-- adapters contain no business rules and never decide what a valid workspace is;
+- adapters contain no business rules and never decide what a valid workspace or
+  a valid setting is;
 - use cases do not parse arguments, do not print to the terminal and do not
   return exit codes;
-- business logic prints nothing and knows neither adapters nor use cases;
+- business logic prints nothing, knows neither adapters nor use cases, and
+  declares the ports (such as the settings repository) that adapters implement;
 - a new command becomes a use case that the terminal adapter calls; a new
-  action belongs to the business logic and is called by a use case;
-- the terminal adapter turns errors of the business logic into user messages
-  and exit codes, so it imports `internal/domain/workspace` to tell them apart;
+  action belongs to the business logic and is called by a use case; a new way
+  to store data becomes an adapter implementing a port of the business logic;
+- adapters turn errors of the business logic into user messages and exit codes,
+  so they import the business logic packages to tell the errors apart;
 - dependencies always point inwards: adapters → use cases → business logic.
 
 `internal/buildinfo` is cross-cutting infrastructure that describes how the
@@ -140,12 +192,19 @@ go build -ldflags "\
 ├── go.mod
 └── internal
     ├── adapters
-    │   └── cli
-    │       ├── cli.go               # terminal adapter: parsing, help, output, exit codes
-    │       └── usage.go             # help texts of the commands
+    │   ├── cli
+    │   │   ├── cli.go               # terminal adapter: parsing, help, output, exit codes
+    │   │   └── usage.go             # help texts of the commands
+    │   └── configfile
+    │       └── configfile.go        # localcloud.yaml storage of the workspace settings
     ├── buildinfo
     │   └── buildinfo.go             # version information of the binary
     ├── domain
+    │   ├── config
+    │   │   ├── config.go            # settings model: infra and services blocks
+    │   │   ├── configurator.go      # module that keeps the settings, repository port
+    │   │   ├── errors.go            # errors describing invalid settings
+    │   │   └── validate.go          # rules the settings must follow
     │   └── workspace
     │       └── workspace.go         # business logic of a local cloud workspace
     └── usecases
