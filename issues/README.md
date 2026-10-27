@@ -82,3 +82,4 @@
 |---|--------|--------|
 | [0001](0001_initialize_go_project.md) | Initialize Go project | выполнена |
 | [0002](0002_init_command_skeleton.md) | Init command skeleton | выполнена |
+| [0003](0003_clean_architecture_layers.md) | Clean architecture layers | выполнена |

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alzasr/localcloud/internal/adapters/cli"
 	"github.com/alzasr/localcloud/internal/buildinfo"
-	"github.com/alzasr/localcloud/internal/cli"
 )
 
 func TestRun(t *testing.T) {

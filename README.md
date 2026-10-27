@@ -82,6 +82,33 @@ it would initialize and exits with code 1. Run `localcloud help init` (or
 `localcloud init --help`) for its syntax. Workspace scaffolding itself will be
 added in a follow-up task.
 
+## Architecture
+
+The project follows clean architecture: layers are separated and dependencies
+point inwards only — adapters know about use cases, use cases know about the
+business logic, never the other way round.
+
+| Layer | Package | Responsibility |
+|-------|---------|----------------|
+| Adapters | `internal/adapters/cli` | Terminal client: argument parsing, help, output formatting and exit codes. |
+| Use cases | `internal/usecases` | User scenarios behind commands, for now `init`: they orchestrate the actions of the business logic. |
+| Business logic | `internal/domain/workspace` | Rules of a local cloud workspace and the concrete actions performed on it. |
+
+Rules:
+
+- adapters contain no business rules and never decide what a valid workspace is;
+- use cases do not parse arguments, do not print to the terminal and do not
+  return exit codes;
+- business logic prints nothing and knows neither adapters nor use cases;
+- a new command becomes a use case that the terminal adapter calls; a new
+  action belongs to the business logic and is called by a use case;
+- the terminal adapter turns errors of the business logic into user messages
+  and exit codes, so it imports `internal/domain/workspace` to tell them apart;
+- dependencies always point inwards: adapters → use cases → business logic.
+
+`internal/buildinfo` is cross-cutting infrastructure that describes how the
+binary was built; the terminal adapter uses it to print `localcloud version`.
+
 ## Development
 
 ```sh
@@ -109,11 +136,18 @@ go build -ldflags "\
 
 ```text
 .
-├── main.go                      # entry point, wires os.Args to the CLI package
+├── main.go                          # entry point, wires os.Args to the CLI adapter
 ├── go.mod
 └── internal
+    ├── adapters
+    │   └── cli
+    │       ├── cli.go               # terminal adapter: parsing, help, output, exit codes
+    │       └── usage.go             # help texts of the commands
     ├── buildinfo
-    │   └── buildinfo.go         # version information of the binary
-    └── cli
-        └── cli.go               # command parsing, help and version output
+    │   └── buildinfo.go             # version information of the binary
+    ├── domain
+    │   └── workspace
+    │       └── workspace.go         # business logic of a local cloud workspace
+    └── usecases
+        └── init.go                  # "init" user scenario
 ```
