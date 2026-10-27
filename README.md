@@ -50,6 +50,7 @@ Usage:
   localcloud <command>
 
 Commands:
+  init      Initialize a local cloud workspace (not implemented yet)
   version   Print version information about the binary
   help      Print this help
 
@@ -70,6 +71,16 @@ toolchain. A binary installed with `go install ...@vX.Y.Z` reports that module
 version; a build inside a Git checkout reports a pseudo-version of the current
 commit (with a `+dirty` suffix when the work tree has uncommitted changes), and
 a build without any VCS information reports `dev`.
+
+```text
+$ localcloud init ./workspace
+localcloud init: creating a local cloud workspace in "./workspace" is not implemented yet
+```
+
+The `init` command is a stub: it validates its arguments, reports the directory
+it would initialize and exits with code 1. Run `localcloud help init` (or
+`localcloud init --help`) for its syntax. Workspace scaffolding itself will be
+added in a follow-up task.
 
 ## Development
 
