@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/alzasr/localcloud/internal/cli"
+	"github.com/alzasr/localcloud/internal/adapters/cli"
 )
 
 func main() {
